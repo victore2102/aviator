@@ -242,12 +242,3 @@ def score_query(query: str, history: list) -> int:
         score = max(score, BALANCED_MAX)
 
     return max(0, int(score))
-
-
-def tier_for_score(score: int) -> str:
-    """Map a numeric score to a tier name using the module thresholds."""
-    if score < FAST_MAX:
-        return "fast"
-    if score < BALANCED_MAX:
-        return "balanced"
-    return "powerful"
