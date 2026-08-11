@@ -9,6 +9,14 @@ borderline cases across a tier boundary.
 
 import re
 
+# Default tier → model-family mappings, written on init so the user has a
+# working config they can edit. Families, not pinned versions (see ADR-02).
+DEFAULT_TIER_MAPPINGS = {
+    "claude_code": {"fast": "haiku", "balanced": "sonnet", "powerful": "opus"},
+    "codex":       {"fast": "mini",  "balanced": "gpt",    "powerful": "codex"},
+    "gemini_cli":  {"fast": "flash-lite", "balanced": "flash", "powerful": "pro"},
+}
+
 # ─────────────────────────────────────────────────────────────
 #  1. Tunable hyperparameters
 # ─────────────────────────────────────────────────────────────

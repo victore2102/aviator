@@ -1,7 +1,5 @@
-from tests.test_scorer import (
-    run_calibration
-)
+"""Marks tests/ as a package so `python -m tests.test_scorer` resolves.
 
-__all__ = [
-    "run_calibration",
-]
+Intentionally empty — importing test modules here would run them on any
+`import tests`, and pytest collects the modules directly regardless.
+"""

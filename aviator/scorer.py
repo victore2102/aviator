@@ -17,7 +17,7 @@ confirm every tier stays above ~90%.
 import re
 from functools import lru_cache
 
-from router.vars import (
+from aviator.vars import (
     FAST_MAX,
     BALANCED_MAX,
     RECENCY_DECAY,
