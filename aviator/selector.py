@@ -9,10 +9,10 @@ def tier_for_score(score: int) -> str:
     return "powerful"
 
 
-def model_family_selection(score: int, harness: str) -> str:
+def model_family_selection(score: int, tier_mappings: dict) -> str:
     """
-    Given AvIator score and harness, return the model family to use.
+    Given AvIator score and tier mappings, return the model family to use.
     """
     tier = tier_for_score(score)
-    model_family = DEFAULT_TIER_MAPPINGS[harness][tier]
+    model_family = tier_mappings[tier]
     return model_family

@@ -7,7 +7,7 @@ AvIator — CLI entrypoint.
 """
 
 import typer
-
+import click
 from aviator.config import (
     VALID_HARNESSES,
     CONFIG_PATH,
@@ -47,6 +47,7 @@ def init(
             raise typer.Exit()
 
     # ── Resolve the harness in priority order ──
+    VALID_HARNESSES_LIST = sorted(VALID_HARNESSES)
 
     # 1. Explicit flag always wins.
     chosen = harness
@@ -61,15 +62,21 @@ def init(
     # 3. Still nothing? Prompt with a clear choice list.
     if chosen is None:
         typer.echo("Which harness are you using?")
-        for i, name in enumerate(sorted(VALID_HARNESSES), 1):
+        for i, name in enumerate(VALID_HARNESSES_LIST, 1):
             typer.echo(f"  {i}. {name}")
-        chosen = typer.prompt("Enter name").strip()
+
+        choice_index = typer.prompt(
+            "Select",
+            type=click.IntRange(1, len(VALID_HARNESSES_LIST)),
+        )
+
+    chosen = VALID_HARNESSES_LIST[choice_index - 1]
 
     # ── Validate ──
     if chosen not in VALID_HARNESSES:
         typer.echo(
             f"'{chosen}' is not a known harness. "
-            f"Choose from: {', '.join(sorted(VALID_HARNESSES))}"
+            f"Choose from: {', '.join(VALID_HARNESSES_LIST)}"
         )
         raise typer.Exit(code=1)
 
@@ -94,6 +101,8 @@ def start():
     """Begin routing using the saved config. No prompts."""
     try:
         harness = resolve_harness()
+        config = load_config()
+        tier_mappings = config.get("tiers", DEFAULT_TIER_MAPPINGS[harness])
     except RuntimeError as e:
         typer.echo(str(e))
         raise typer.Exit(code=1)

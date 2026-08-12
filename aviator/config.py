@@ -5,10 +5,10 @@ Source of truth is the user's config file (written by `aviator init`).
 Detection is a best-effort convenience for first run only; it never
 silently overrides an explicit choice.
 
-NOTE: claude_code's signals are verified against a real install; codex and
-gemini_cli are still starting guesses (see _HARNESS_SIGNALS). Verify each
-against the actual CLI before trusting it — run the CLI and inspect its
-environment and dotfiles. These values drift between versions.
+NOTE: all three harnesses' signals are verified — claude_code against a real
+install, codex and gemini_cli against their upstream source (see
+_HARNESS_SIGNALS for provenance per entry). These values drift between
+versions, so re-check them before each release.
 """
 
 import os
@@ -51,19 +51,30 @@ _HARNESS_SIGNALS = {
         "config_paths": ["~/.claude"],
         "binary": "claude",
     },
-    # UNVERIFIED — no Codex install available to inspect.
+    # VERIFIED 2026-08-11 against openai/codex source (main).
     # Beware when checking by hand: macOS ships an unrelated Apple cryptex
     # path containing "codex" in PATH, so grep PATH for it at your peril.
     # `shutil.which` is unaffected.
     "codex": {
-        "runtime_env": ["CODEX_SANDBOX", "CODEX_SESSION"],
+        # Both inserted into the child environment by exec_env.rs; literal
+        # values defined in protocol/src/shell_environment.rs.
+        # NOTE: there is no bare CODEX_SANDBOX. CODEX_SANDBOX_NETWORK_DISABLED
+        # exists (spawn.rs) but is only set when network sandboxing is off,
+        # so its absence proves nothing — unusable as a presence signal.
+        "runtime_env": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
+        # Default home is ~/.codex holding config.toml. Overridable by the
+        # CODEX_HOME env var, which this path list does not yet honour.
         "config_paths": ["~/.codex/config.toml", "~/.codex"],
         "binary": "codex",
     },
-    # UNVERIFIED — no Gemini CLI install available to inspect.
+    # VERIFIED 2026-08-11 against google-gemini/gemini-cli source (main).
     "gemini_cli": {
-        "runtime_env": ["GEMINI_CLI", "GEMINI_SESSION"],
-        "config_paths": ["~/.gemini", "~/.config/gemini"],
+        # GEMINI_CLI=1 is set unconditionally on spawned children in
+        # services/shellExecutionService.ts. No GEMINI_SESSION var exists.
+        "runtime_env": ["GEMINI_CLI"],
+        # ~/.gemini/settings.json per docs/reference/configuration.md. No XDG
+        # variant. Root overridable by GEMINI_CLI_HOME, not honoured here.
+        "config_paths": ["~/.gemini/settings.json", "~/.gemini"],
         "binary": "gemini",
     },
 }

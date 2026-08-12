@@ -15,6 +15,10 @@ The stylization **AvIator** is intentional. Capitalizing the `A` and the `I` sur
 
 ## Repository Structure
 
+> **Superseded by ADR-03.** The `router/` and `cli/` split described below was
+> replaced by a single top-level `aviator/` package. The diagram is kept as a
+> record of the original decision; see ADR-03 for the reasoning behind the change.
+
 ```
 aviator/
 ├── assets/
