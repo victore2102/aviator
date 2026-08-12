@@ -19,8 +19,6 @@ import yaml
 
 VALID_HARNESSES = {"claude_code", "codex", "gemini_cli"}
 
-# Where AvIator stores its config. Kept in the user's home so it persists
-# across projects and sessions, not tied to any one working directory.
 CONFIG_DIR = Path.home() / ".aviator"
 CONFIG_PATH = CONFIG_DIR / "config.yaml"
 
@@ -32,48 +30,19 @@ CONFIG_PATH = CONFIG_DIR / "config.yaml"
 # Each entry: signals that suggest a given harness is active.
 # Ordered from strongest signal (set by the running process) to weakest
 # (merely installed).
-#
-# Status per harness is marked below. Anything still UNVERIFIED is a
-# structural guess and must be confirmed by running that CLI and inspecting
-# its environment (`env | grep -i <name>`) and dotfiles.
 _HARNESS_SIGNALS = {
-    # VERIFIED 2026-08-11 against Claude Code 2.1.222 (desktop entrypoint).
     "claude_code": {
-        # CLAUDECODE=1 is the canonical marker — set in every entrypoint.
-        # CLAUDE_CODE_ENTRYPOINT carries which surface is running
-        # ("cli", "claude-desktop", ...); presence alone is the signal.
-        # NOTE: the session var is CLAUDE_CODE_SESSION_ID, not
-        # CLAUDE_CODE_SESSION. It is deliberately not listed — it is a
-        # per-session detail, and CLAUDECODE already covers the same case.
         "runtime_env": ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"],
-        # ~/.claude confirmed (holds projects/, sessions/, plugins/, ...).
-        # No XDG variant is created; ~/.config/claude does not exist.
         "config_paths": ["~/.claude"],
         "binary": "claude",
     },
-    # VERIFIED 2026-08-11 against openai/codex source (main).
-    # Beware when checking by hand: macOS ships an unrelated Apple cryptex
-    # path containing "codex" in PATH, so grep PATH for it at your peril.
-    # `shutil.which` is unaffected.
     "codex": {
-        # Both inserted into the child environment by exec_env.rs; literal
-        # values defined in protocol/src/shell_environment.rs.
-        # NOTE: there is no bare CODEX_SANDBOX. CODEX_SANDBOX_NETWORK_DISABLED
-        # exists (spawn.rs) but is only set when network sandboxing is off,
-        # so its absence proves nothing — unusable as a presence signal.
         "runtime_env": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
-        # Default home is ~/.codex holding config.toml. Overridable by the
-        # CODEX_HOME env var, which this path list does not yet honour.
         "config_paths": ["~/.codex/config.toml", "~/.codex"],
         "binary": "codex",
     },
-    # VERIFIED 2026-08-11 against google-gemini/gemini-cli source (main).
     "gemini_cli": {
-        # GEMINI_CLI=1 is set unconditionally on spawned children in
-        # services/shellExecutionService.ts. No GEMINI_SESSION var exists.
         "runtime_env": ["GEMINI_CLI"],
-        # ~/.gemini/settings.json per docs/reference/configuration.md. No XDG
-        # variant. Root overridable by GEMINI_CLI_HOME, not honoured here.
         "config_paths": ["~/.gemini/settings.json", "~/.gemini"],
         "binary": "gemini",
     },
