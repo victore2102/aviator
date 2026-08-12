@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aviator"
+version = "0.1.0"
+description = "An LLM routing library that automatically selects the right model for each query."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Victor Ekpenyong" }]
+keywords = ["llm", "routing", "claude", "codex", "gemini", "cost-optimization"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "typer>=0.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+aviator = "aviator.:app"
+
+[tool.setuptools]
+packages = ["aviator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

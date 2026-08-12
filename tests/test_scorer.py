@@ -17,16 +17,16 @@ weights in scorer.py, run the calibration and confirm every tier stays above
 
 import pytest
 
-from router.scorer import (
+from aviator.scorer import (
     code_score,
     score_query,
     score_history,
-    tier_for_score,
     _base_item_score,
     _keyword_score,
     FAST_MAX,
     BALANCED_MAX,
 )
+from aviator.selector import tier_for_score
 
 
 # ═════════════════════════════════════════════════════════════

@@ -1,3 +1,44 @@
+# ── Virtual environments ──
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── Byte-compiled / cache ──
 **/__pycache__/
 *.py[cod]
 *$py.class
+
+# ── Packaging / build artifacts ──
+*.egg-info/
+*.egg
+build/
+dist/
+wheels/
+.installed.cfg
+MANIFEST
+
+# ── Test & lint caches ──
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ── Secrets & local config ──
+# AvIator writes its own config to ~/.aviator, outside the repo, but keep
+# stray local env files out regardless.
+.env
+.env.*
+!.env.example
+
+# ── Editors / OS ──
+.vscode/
+.idea/
+*.swp
+.DS_Store
