@@ -11,13 +11,29 @@ _HARNESS_SIGNALS for provenance per entry). These values drift between
 versions, so re-check them before each release.
 """
 
+import difflib
 import os
 import shutil
 from pathlib import Path
 import yaml
 
+from aviator.vars import DEFAULT_TIER_MAPPINGS
+
 
 VALID_HARNESSES = {"claude_code", "codex", "gemini_cli"}
+
+TIER_NAMES = ("fast", "balanced", "powerful")
+
+
+class ConfigError(RuntimeError):
+    """
+    A user-fixable problem with the config file.
+
+    Subclasses RuntimeError so existing `except RuntimeError` handlers still
+    catch it, but lets callers distinguish "your config is wrong" from any
+    other runtime failure. The message is user-facing: it should name the
+    file, the offending key, and the fix.
+    """
 
 CONFIG_DIR = Path.home() / ".aviator"
 CONFIG_PATH = CONFIG_DIR / "config.yaml"
@@ -116,11 +132,46 @@ def detect_harness() -> str | None:
 # ─────────────────────────────────────────────────────────────
 
 def load_config() -> dict:
-    """Load AvIator config, or return an empty dict if none exists yet."""
+    """
+    Load AvIator config, or return an empty dict if none exists yet.
+
+    A missing file is not an error — it means "not set up yet", and callers
+    distinguish that from a broken file. Anything that IS an error is raised
+    as ConfigError so that yaml and OS exceptions stay an implementation
+    detail of this module rather than leaking to the CLI.
+    """
     if not CONFIG_PATH.exists():
         return {}
-    with open(CONFIG_PATH) as f:
-        return yaml.safe_load(f) or {}
+
+    try:
+        with open(CONFIG_PATH) as f:
+            loaded = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        # The parser error carries line/column info that is genuinely useful,
+        # so it is surfaced rather than replaced with a generic message.
+        raise ConfigError(
+            f"Could not parse {CONFIG_PATH} — it is not valid YAML.\n\n{e}"
+        ) from e
+    except OSError as e:
+        raise ConfigError(f"Could not read {CONFIG_PATH}: {e}") from e
+
+    # An empty file parses to None, which is a legitimate "nothing set yet".
+    if loaded is None:
+        return {}
+
+    # A scalar or list at the top level parses fine but is not a config.
+    if not isinstance(loaded, dict):
+        raise ConfigError(
+            f"{CONFIG_PATH} should contain a mapping of settings, but its "
+            f"top level is a {type(loaded).__name__}.\n"
+            "Expected something like:\n"
+            "  harness: claude_code\n"
+            "  tiers:\n"
+            "    fast: haiku\n"
+            "Delete the file and re-run `aviator init` to regenerate it."
+        )
+
+    return loaded
 
 
 def save_config(config: dict) -> None:
@@ -153,3 +204,69 @@ def resolve_harness(config: dict | None = None) -> str:
         "Run `aviator init` to set it, or add `harness: <name>` to "
         f"{CONFIG_PATH}.\nOptions: {', '.join(sorted(VALID_HARNESSES))}"
     )
+
+def _suggest(value: str, options) -> str:
+    """Return a ' Did you mean X?' fragment, or '' if nothing is close."""
+    close = difflib.get_close_matches(str(value).lower(), sorted(options), n=1)
+    return f" Did you mean '{close[0]}'?" if close else ""
+
+
+def resolve_tiers(config: dict | None = None, harness: str | None = None) -> dict:
+    """
+    Return a complete {tier: model_family} mapping for the active harness.
+
+    User config wins per key, defaults fill the gaps. Partial customisation is
+    legitimate — overriding only `powerful` should not cost you the other two.
+
+    The distinction that matters: an ABSENT `tiers` block is normal and falls
+    back to defaults silently. A PRESENT but malformed one raises, because
+    silently substituting defaults would discard what the user wrote and give
+    them no way to tell — the same invisible-failure class that made the
+    selector ignore config in the first place.
+    """
+    config = config if config is not None else load_config()
+    harness = harness if harness is not None else resolve_harness(config)
+
+    if harness not in DEFAULT_TIER_MAPPINGS:
+        raise ConfigError(
+            f"No default tier mapping exists for harness '{harness}'."
+            f"{_suggest(harness, DEFAULT_TIER_MAPPINGS)}"
+        )
+
+    resolved = dict(DEFAULT_TIER_MAPPINGS[harness])
+
+    user_tiers = config.get("tiers")
+    if user_tiers is None:
+        return resolved
+
+    if not isinstance(user_tiers, dict):
+        raise ConfigError(
+            f"{CONFIG_PATH}: `tiers` should be a mapping of tier names to "
+            f"model families, but it is a {type(user_tiers).__name__}.\n"
+            "Expected:\n"
+            "  tiers:\n"
+            "    fast: haiku\n"
+            "    balanced: sonnet\n"
+            "    powerful: opus"
+        )
+
+    for tier, family in user_tiers.items():
+        # An unrecognised key is almost always a typo. Falling through to the
+        # default here would silently ignore the user's edit, so it raises.
+        if tier not in TIER_NAMES:
+            raise ConfigError(
+                f"{CONFIG_PATH}: '{tier}' is not a known tier."
+                f"{_suggest(tier, TIER_NAMES)}\n"
+                f"Valid tiers: {', '.join(TIER_NAMES)}"
+            )
+
+        if not isinstance(family, str) or not family.strip():
+            raise ConfigError(
+                f"{CONFIG_PATH}: tier '{tier}' should map to a model family "
+                f"name, but its value is {family!r}.\n"
+                f"For example:  {tier}: {DEFAULT_TIER_MAPPINGS[harness][tier]}"
+            )
+
+        resolved[tier] = family.strip()
+
+    return resolved

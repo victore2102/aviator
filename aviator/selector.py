@@ -1,4 +1,4 @@
-from aviator.vars import DEFAULT_TIER_MAPPINGS, FAST_MAX, BALANCED_MAX
+from aviator.vars import FAST_MAX, BALANCED_MAX
 
 def tier_for_score(score: int) -> str:
     """Map a numeric score to a tier name using the module thresholds."""

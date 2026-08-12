@@ -14,6 +14,11 @@ everything downstream (which needs model strings). Two things are pinned here:
      explicit, visible act (see ADR-02), not something that slips through
      because every test was written in terms of the constants it changed.
 
+model_family_selection takes a flat {tier: family} mapping, so these tests
+build that mapping directly rather than reading config from disk. That is the
+whole benefit of keeping the selector pure — no filesystem, no home directory,
+no mocking.
+
 Run with:  pytest tests/test_selector.py
 """
 
@@ -23,6 +28,10 @@ from aviator.selector import tier_for_score, model_family_selection
 from aviator.vars import FAST_MAX, BALANCED_MAX, DEFAULT_TIER_MAPPINGS
 
 TIERS = ("fast", "balanced", "powerful")
+
+# A mapping with no relationship to any real model, so a test failure points
+# at the lookup logic rather than at whatever the defaults happen to say.
+SENTINEL_TIERS = {"fast": "F", "balanced": "B", "powerful": "P"}
 
 
 # ═════════════════════════════════════════════════════════════
@@ -40,16 +49,16 @@ class TestTierBoundaries:
     @pytest.mark.parametrize(
         "score, expected",
         [
-            (0, "fast"),                    # floor — score_query clamps at 0
+            (0, "fast"),                     # floor — score_query clamps at 0
             (1, "fast"),
-            (FAST_MAX - 1, "fast"),         # last fast score
-            (FAST_MAX, "balanced"),         # first balanced score
+            (FAST_MAX - 1, "fast"),          # last fast score
+            (FAST_MAX, "balanced"),          # first balanced score
             (FAST_MAX + 1, "balanced"),
-            (BALANCED_MAX - 1, "balanced"), # last balanced score
-            (BALANCED_MAX, "powerful"),     # first powerful score
+            (BALANCED_MAX - 1, "balanced"),  # last balanced score
+            (BALANCED_MAX, "powerful"),      # first powerful score
             (BALANCED_MAX + 1, "powerful"),
             (100, "powerful"),
-            (10_000, "powerful"),           # no upper clamp — must not wrap
+            (10_000, "powerful"),            # no upper clamp — must not wrap
         ],
     )
     def test_boundary_values_map_to_expected_tier(self, score, expected):
@@ -76,8 +85,7 @@ class TestTierPartition:
         property the whole cost argument rests on.
         """
         rank = {tier: i for i, tier in enumerate(TIERS)}
-        scores = range(0, BALANCED_MAX + 50)
-        ranks = [rank[tier_for_score(s)] for s in scores]
+        ranks = [rank[tier_for_score(s)] for s in range(0, BALANCED_MAX + 50)]
         assert ranks == sorted(ranks)
 
     def test_all_three_tiers_are_reachable(self):
@@ -108,64 +116,87 @@ class TestThresholdValuesArePinned:
 
 
 # ═════════════════════════════════════════════════════════════
-#  2. model_family_selection — score + harness → family
+#  2. model_family_selection — score + tier mapping → family
 # ═════════════════════════════════════════════════════════════
 
 class TestModelFamilySelection:
-    """
-    NOTE: these pin the CURRENT behaviour, which reads DEFAULT_TIER_MAPPINGS
-    rather than the user's ~/.aviator/config.yaml. When the function is
-    changed to honour user config, these tests must change with it — they are
-    a description of today's contract, not an argument for keeping it.
-    """
+    """Score picks the tier; the caller's mapping picks the family."""
+
+    @pytest.mark.parametrize(
+        "score, expected",
+        [
+            (0, "F"),
+            (FAST_MAX - 1, "F"),
+            (FAST_MAX, "B"),
+            (BALANCED_MAX - 1, "B"),
+            (BALANCED_MAX, "P"),
+            (100, "P"),
+        ],
+    )
+    def test_returns_the_family_for_the_scores_tier(self, score, expected):
+        assert model_family_selection(score, SENTINEL_TIERS) == expected
+
+    def test_uses_the_caller_supplied_mapping_not_the_defaults(self):
+        """
+        The regression guard for the bug this signature was introduced to fix:
+        the selector previously read DEFAULT_TIER_MAPPINGS directly, so edits
+        to the user's config had no effect on routing. A custom mapping must
+        win, even when it contradicts the shipped defaults.
+        """
+        custom = {"fast": "opus", "balanced": "opus", "powerful": "haiku"}
+        assert model_family_selection(10, custom) == "opus"
+        assert model_family_selection(90, custom) == "haiku"
+
+    def test_selector_does_not_depend_on_the_defaults_table(self):
+        """
+        Nothing in a routing decision should reference DEFAULT_TIER_MAPPINGS.
+        Guards against the import quietly creeping back in.
+        """
+        import aviator.selector as selector
+
+        assert not hasattr(selector, "DEFAULT_TIER_MAPPINGS"), (
+            "selector.py should no longer import DEFAULT_TIER_MAPPINGS — "
+            "tier mappings arrive as an argument"
+        )
 
     @pytest.mark.parametrize("harness", sorted(DEFAULT_TIER_MAPPINGS))
     @pytest.mark.parametrize(
         "score, tier",
         [
             (0, "fast"),
-            (FAST_MAX - 1, "fast"),
             (FAST_MAX, "balanced"),
-            (BALANCED_MAX - 1, "balanced"),
             (BALANCED_MAX, "powerful"),
-            (100, "powerful"),
         ],
     )
-    def test_returns_the_family_mapped_to_the_scores_tier(self, harness, score, tier):
-        expected = DEFAULT_TIER_MAPPINGS[harness][tier]
-        assert model_family_selection(score, harness) == expected
-
-    @pytest.mark.parametrize(
-        "harness, score, expected",
-        [
-            ("claude_code", 10, "haiku"),
-            ("claude_code", 40, "sonnet"),
-            ("claude_code", 90, "opus"),
-            ("codex", 10, "mini"),
-            ("codex", 40, "gpt"),
-            ("codex", 90, "codex"),
-            ("gemini_cli", 10, "flash-lite"),
-            ("gemini_cli", 40, "flash"),
-            ("gemini_cli", 90, "pro"),
-        ],
-    )
-    def test_known_pairs_resolve_to_expected_families(self, harness, score, expected):
-        """Spelled out literally so a typo in the mapping table is visible."""
-        assert model_family_selection(score, harness) == expected
-
-    def test_unknown_harness_raises(self):
+    def test_works_with_each_shipped_default_mapping(self, harness, score, tier):
         """
-        Currently a bare KeyError from the dict lookup. Pinned so that
-        changing it to a clearer error is a deliberate, visible edit.
+        The defaults are what init seeds, so every one of them must be a
+        usable argument even though the selector no longer reaches for them.
         """
-        with pytest.raises(KeyError):
-            model_family_selection(50, "not_a_harness")
+        mapping = DEFAULT_TIER_MAPPINGS[harness]
+        assert model_family_selection(score, mapping) == mapping[tier]
 
+    def test_incomplete_mapping_raises_on_the_missing_tier(self):
+        """
+        Pins today's behaviour: a partial mapping fails at routing time with a
+        bare KeyError naming the tier. This is the failure config validation
+        is meant to prevent from ever reaching here — when resolve_tiers()
+        lands and fills gaps from the defaults, this test should be revisited.
+        """
+        partial = {"fast": "haiku", "powerful": "opus"}
+        assert model_family_selection(10, partial) == "haiku"
+        with pytest.raises(KeyError, match="balanced"):
+            model_family_selection(FAST_MAX, partial)
+
+
+# ═════════════════════════════════════════════════════════════
+#  3. The shipped defaults table
+# ═════════════════════════════════════════════════════════════
 
 class TestTierMappingTableIsWellFormed:
     """
-    The mapping table is data, and data drifts. These guard the shape rather
-    than the contents, so adding a harness stays cheap but adding a broken one
+    The mapping table is data, and data drifts. These guard its shape rather
+    than its contents, so adding a harness stays cheap but adding a broken one
     does not.
     """
 
