@@ -190,10 +190,20 @@ def resolve_harness(config: dict | None = None) -> str:
 
     # 1. Explicit config is the source of truth.
     harness = config.get("harness")
-    if harness in VALID_HARNESSES:
-        return harness
+    if harness is not None:
+        if harness in VALID_HARNESSES:
+            return harness
+        # Set, but not a harness we know. Falling through to detection here
+        # would silently route the user's queries to a different provider
+        # than the one they named — the worst failure this tool can have,
+        # because it succeeds. An explicit wrong answer beats a silent one.
+        raise ConfigError(
+            f"{CONFIG_PATH}: '{harness}' is not a known harness."
+            f"{_suggest(harness, VALID_HARNESSES)}\n"
+            f"Valid options: {', '.join(sorted(VALID_HARNESSES))}"
+        )
 
-    # 2. No valid config — try detection as a convenience.
+    # 2. Nothing set at all — try detection as a convenience.
     detected = detect_harness()
     if detected:
         return detected
