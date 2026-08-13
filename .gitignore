@@ -37,6 +37,10 @@ coverage.xml
 .env.*
 !.env.example
 
+# ── Personal working docs (not repo content) ──
+/BUILD-PLAN.md
+/CONTEXT*
+
 # ── Editors / OS ──
 .vscode/
 .idea/
