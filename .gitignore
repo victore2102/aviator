@@ -9,6 +9,7 @@ ENV/
 **/__pycache__/
 *.py[cod]
 *$py.class
+*.bkp
 
 # ── Packaging / build artifacts ──
 *.egg-info/
@@ -36,6 +37,21 @@ coverage.xml
 .env
 .env.*
 !.env.example
+
+# ── Traffic captures (real conversation content — never commit) ──
+# scripts/observe.py dumps full request bodies and raw response streams so the
+# wire format can be established from evidence rather than assumed. Those files
+# contain live prompts, source code, and file contents from real sessions.
+# Both the directory and the filename patterns are ignored, so a capture
+# written to the wrong place is still caught.
+captures/
+*.capture.json
+*.capture.jsonl
+*.capture.sse
+
+# ── Personal working docs (not repo content) ──
+/BUILD-PLAN.md
+/CONTEXT*
 
 # ── Editors / OS ──
 .vscode/

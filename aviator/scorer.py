@@ -18,7 +18,6 @@ import re
 from functools import lru_cache
 
 from aviator.vars import (
-    FAST_MAX,
     BALANCED_MAX,
     RECENCY_DECAY,
     MAX_DEPTH_BONUS,

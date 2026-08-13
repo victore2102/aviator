@@ -29,7 +29,7 @@ dev = [
 ]
 
 [project.scripts]
-aviator = "aviator.:app"
+aviator = "aviator.cli:app"
 
 [tool.setuptools]
 packages = ["aviator"]

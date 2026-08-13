@@ -23,10 +23,9 @@ from aviator.scorer import (
     score_history,
     _base_item_score,
     _keyword_score,
-    FAST_MAX,
-    BALANCED_MAX,
 )
 from aviator.selector import tier_for_score
+from aviator.vars import FAST_MAX, BALANCED_MAX
 
 
 # ═════════════════════════════════════════════════════════════
