@@ -9,6 +9,7 @@ ENV/
 **/__pycache__/
 *.py[cod]
 *$py.class
+*.bkp
 
 # ── Packaging / build artifacts ──
 *.egg-info/
